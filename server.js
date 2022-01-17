@@ -3,6 +3,10 @@ const Koa = require("koa");
 const path = require("path");
 const static = require("koa-static");
 const mount = require("koa-mount");
+const bodyParser = require('koa-bodyparser');
+const Router = require('koa-router');
+const router = new Router();
+const fetch = require('isomorphic-fetch');
 
 const { default: createShopifyAuth } = require("@shopify/koa-shopify-auth");
 const { verifyRequest } = require("@shopify/koa-shopify-auth");
@@ -10,6 +14,9 @@ const session = require("koa-session");
 
 const dotenv = require("dotenv");
 dotenv.config();
+
+let ACCESS_TOKEN = '';
+let SHOP_NAME = '';
 
 const port = parseInt(process.env.PORT, 10) || 3000;
 
@@ -20,15 +27,19 @@ buildServer();
 async function buildServer() {
   const server = new Koa();
   server.use(session(server));
+  server.use(bodyParser());
   server.keys = [SHOPIFY_API_SECRET_KEY];
 
   server.use(
     createShopifyAuth({
       apiKey: SHOPIFY_API_KEY,
       secret: SHOPIFY_API_SECRET_KEY,
-      scopes: ["read_products", "read_orders"],
+      scopes: ["read_products", "read_orders", "write_products", "write_orders", "read_assigned_fulfillment_orders", "write_assigned_fulfillment_orders", "read_checkouts", "write_checkouts", "read_content", "write_content", "read_customers", "write_customers", "read_discounts", "write_discounts", "read_script_tags", "write_script_tags", "read_themes", "write_themes"],
       afterAuth(ctx) {
         const { shop, accessToken } = ctx.session;
+        console.log('After Auth', shop, accessToken);
+        ACCESS_TOKEN = accessToken;
+        SHOP_NAME = shop;
         ctx.cookies.set("shopOrigin", shop, { httpOnly: false });
         ctx.redirect("/");
       }
@@ -36,6 +47,9 @@ async function buildServer() {
   );
 
   server.use(verifyRequest());
+  server
+    .use(router.routes())
+    .use(router.allowedMethods());
 
   if (process.env.NODE_ENV === "production") {
     server.use(mount("/", static(__dirname + "/public")));
@@ -68,3 +82,21 @@ async function webpackMiddleware(server) {
     );
   });
 }
+
+
+router
+  .get('/products', async (ctx, next) => {
+    console.log('During Call', SHOP_NAME, ACCESS_TOKEN);
+    try {
+      let response = await fetch(`https://${SHOP_NAME}/admin/api/2021-10/products.json`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': ACCESS_TOKEN
+        }
+      });
+      let data = await response.json();
+      ctx.body = data;
+    } catch (err) {
+      console.log('Errors', error);
+    }
+  });

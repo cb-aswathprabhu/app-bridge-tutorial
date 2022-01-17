@@ -5,49 +5,48 @@
   App container component.
 
 */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-import NewTodoForm from "./NewTodoForm";
-import TodoList from "./TodoList";
+const getProducts = () => {
+  return fetch('/products').then((response) => response.json());
+}
 
 export default function AppPage() {
-  const [isNewTodoFormActive, setNewTodoFormActive] = useState(false);
-  const [todoItems, setTodoItems] = useState([]);
+  const [products, setProducts] = useState([]);
 
-  function openNewTodoForm() {
-    setNewTodoFormActive(true);
+  useEffect(() => {
+    getProducts()
+      .then((data) => setProducts(data.products));
+  }, [])
+
+  function handleNewTab() {
+    window.open('https://dbf8-110-172-187-6.ngrok.io?shop=debris-magics.myshopify.com', '_blank').focus();
   }
 
-  function closeNewTodoForm() {
-    setNewTodoFormActive(false);
-  }
-
-  function submitNewTodoForm(newTodoItem) {
-    const newTodoList = [newTodoItem, ...todoItems];
-    setTodoItems(newTodoList);
-    setNewTodoFormActive(false);
-  }
-
-  function toggleTodoComplete(index) {
-    const newTodoList = [...todoItems];
-    newTodoList[index].complete = !newTodoList[index].complete;
-    setTodoItems(newTodoList);
-  }
-
-  if (isNewTodoFormActive) {
-    return (
-      <NewTodoForm
-        onSubmitForm={submitNewTodoForm}
-        onDiscard={closeNewTodoForm}
-      />
-    );
-  } else {
-    return (
-      <TodoList
-        todoListItems={todoItems}
-        createTodoAction={openNewTodoForm}
-        toggleTodoComplete={toggleTodoComplete}
-      />
-    );
-  }
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between'}}>
+      {products.length !== 0 ? (
+        <>
+          <ul>
+            {products.map((product) => {
+              let { title, updated_at, vendor, status, id } = product;
+              return (
+                <li key={id.toString()}>
+                  <div>Title: {title}</div>
+                  <div>Updated At: {updated_at}</div>
+                  <div>Vendor: {vendor}</div>
+                  <div>Status: {status}</div>
+                </li>
+              )
+            })}
+          </ul>
+          <div>
+            <button onClick={handleNewTab}>Open In New Tab</button>
+          </div>
+        </>
+      ) : (
+        <div>Loading Products...</div>
+      )}
+    </div>
+  )
 }
